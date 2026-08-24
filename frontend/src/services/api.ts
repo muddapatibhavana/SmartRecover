@@ -8,7 +8,7 @@ import {
   ExecuteActionResponse
 } from '../types';
 
-const API_BASE = '/api';
+const API_BASE = 'https://smartrecover-backend.onrender.com/api';
 
 export async function fetchDashboardMetrics(): Promise<DashboardMetrics> {
   const res = await fetch(`${API_BASE}/dashboard`);
