@@ -3,7 +3,7 @@
 > **"AI-powered payment recovery with safe stopping."**  
 > *Recover more revenue without giving AI unlimited control.*
 
-SmartRecover is an enterprise-grade fintech platform engineered specifically for **recurring subscription payment and mandate recovery** (e-NACH, UPI AutoPay, recurring cards).
+SmartRecover is an enterprise-grade fintech platform engineered specifically for **recurring subscription payment and mandate recovery** (e-NACH, UPI AutoPay, recurring card mandates).
 
 ---
 
@@ -11,189 +11,161 @@ SmartRecover is an enterprise-grade fintech platform engineered specifically for
 
 SmartRecover is **not** a simple automatic retry script. Its foundational architecture guarantees:
 
-> **"AI recommends. Guardrails control. Automation stops safely."**
+> **"AI RECOMMENDS. DETERMINISTIC GUARDRAILS DECIDE. AUTOMATION STOPS SAFELY."**
 
-- **The AI layer is strictly advisory**: It analyzes multi-factor customer history and failure telemetry to output an explainable Recovery Score (0–100), recovery probability, and recommended action (`RETRY`, `NOTIFY`, `HUMAN_REVIEW`, `STOP`).
+- **The AI layer is strictly advisory**: It analyzes multi-factor customer history, failure telemetry, and behavioral signals to compute an explainable Recovery Score (0–100), success probability, structured recovery strategy, and expected revenue retention.
 - **The AI NEVER executes transactions directly**, NEVER modifies guardrail rules, and NEVER bypasses the authoritative backend engine.
 - **The GuardrailEngine is authoritative and deterministic**: Every proposed recovery action must pass 10 immutable fintech safety rules before execution.
+- **Simulation-Only Gateway**: No real payment credentials or real money transactions are ever executed.
 
 ```
-Payment Event
-    ↓
-Recovery Case
-    ↓
-Customer Context
-    ↓
-Recovery Intelligence (AI Advisory)
-    ↓
-AI Recommendation & Explainable Factors
-    ↓
-Deterministic Guardrail Engine
-    ↓
-Allowed / Blocked
-    ↓
-Recovery Workflow Engine (State Machine)
-    ↓
-Simulated Retry / Notify / Human Review
-    ↓
-Payment Result
-    ↓
-Immutable Audit Log
-    ↓
-Automatic Stop (when payment succeeds or stopping rule triggers)
+Payment Failure Event
+        ↓
+Recovery Case Creation
+        ↓
+Customer Historical & Financial Context
+        ↓
+Recovery Strategy Optimizer (AI Advisory)
+        ↓
+AI Recommendation & Explainability Factors
+        ↓
+Authoritative Guardrail Engine (10 Deterministic Invariants)
+   ├── ALLOWED ──→ Scheduled Delayed Execution ──→ Simulated Clearance ──→ RECOVERED ──→ STOPPED
+   └── BLOCKED ──→ Safe Automatic Stop / Human Review Escalation ────────→ STOPPED
+        ↓
+Immutable Audit Trail (with State Diffs & SIMULATION_ONLY Badges)
 ```
 
 ---
 
-## 2. Recovery State Machine
+## 2. Five Major Capabilities
 
-SmartRecover enforces an explicit 12-state machine:
+### 1. Recovery Strategy Optimizer
+Computes optimal, structured recovery strategies tailored to individual customer and failure characteristics:
+- **Strategies**: `RETRY_NOW`, `RETRY_AFTER_6H`, `RETRY_AFTER_24H`, `RETRY_AFTER_48H`, `SEND_PAYMENT_REMINDER`, `REQUEST_PAYMENT_METHOD_UPDATE`, `REQUEST_MANDATE_REAUTHORIZATION`, `HUMAN_REVIEW`, `STOP_RECOVERY`.
+- **Metrics**: Recovery Score (0–100), estimated clearance probability, expected recovery amount ($\text{Amount} \times p$), AI confidence level, recommended delay (cooldown hours), and explainable positive/negative factors.
 
-```
-FAILED → ANALYZING → AI_RECOMMENDED → GUARDRAIL_CHECK → ACTION_ALLOWED → RETRY_SCHEDULED → RETRYING → RECOVERED → STOPPED
-                                                    ↘
-                                                      ACTION_BLOCKED → HUMAN_REVIEW → STOPPED
-```
+### 2. Failure-Reason Intelligence
+Standardized classification across 9 recurring payment failure categories:
+1. `BANK_NETWORK_TIMEOUT` (Infrastructure switch timeout • 24h retry • Low risk • 88% recovery rate)
+2. `PROCESSING_TIMEOUT` (NPCI batch queue timeout • 24h retry • Low risk • 85% recovery rate)
+3. `INSUFFICIENT_FUNDS` (Balance shortfall • SMS/WhatsApp reminder + 48h retry • Medium risk • 68% recovery rate)
+4. `MANDATE_EXPIRED` (Mandate validity elapsed • Re-authorization link • High risk • Operator review)
+5. `PAYMENT_METHOD_INVALID` (Card expired / account closed • Update credentials link • High risk)
+6. `CUSTOMER_DISPUTE` (Chargeback filed • Immediate recovery lock • Critical risk • Zero retry)
+7. `FRAUD_OR_RISK_SIGNAL` (Sanctions/velocity anomaly • Lock mandate • Critical risk)
+8. `REPEATED_FAILURE` (2 attempts exhausted in cycle • Hard limit stop • Human review)
+9. `UNKNOWN_FAILURE` (Unclassified decline • Conservative 24h cooldown)
 
-### Valid States:
-1. `FAILED`: Initial mandate failure detected.
-2. `ANALYZING`: Extracting customer context & telemetry.
-3. `AI_RECOMMENDED`: Explainable recovery score & recommendation generated.
-4. `GUARDRAIL_CHECK`: Authoritative safety invariant verification.
-5. `ACTION_ALLOWED`: Guardrails verified and action permitted.
-6. `ACTION_BLOCKED`: Guardrails detected violation (e.g. dispute, max attempts).
-7. `RETRY_SCHEDULED`: Retry cooldown queued (minimum 24-hour interval).
-8. `RETRYING`: Simulated mandate debit in execution.
-9. `NOTIFICATION_SENT`: Customer notified via email/SMS.
-10. `RECOVERED` *(Terminal)*: Mandate successfully debited and revenue captured.
-11. `HUMAN_REVIEW` *(Terminal / Flagged)*: Escrowed for manual operator resolution.
-12. `STOPPED` *(Terminal)*: Safe stop applied.
+### 3. What-If Recovery Simulator
+Interactive, multi-pathway strategy comparison sandbox:
+- Evaluates 5 recovery strategies simultaneously: **6h Retry vs 24h Retry vs 48h Retry vs Payment Reminder vs Stop Recovery**.
+- Displays probability curves, expected revenue, risk levels, customer contact friction, and guardrail pre-check verifications.
+- Prominently watermarked with `SIMULATION — NO PAYMENT WILL BE EXECUTED` and audited as `SIMULATION_ONLY`.
 
----
+### 4. Revenue-at-Risk Prioritization
+Priority ranking engine that values failed payments by **Expected Recoverable Revenue** ($\text{Amount} \times \text{Clearance Probability}$) rather than nominal face value alone:
+- **Priority Tiers**: `HIGH`, `MEDIUM`, `LOW`.
+- **Ranked Opportunity Queue**: Lists top revenue recovery opportunities with explainable drivers and guardrail eligibility badges.
+- **KPI Metrics**: Total Revenue at Risk, Total Expected Recoverable Volume, High/Medium/Low priority volume breakdowns.
 
-## 3. 10 Authoritative Deterministic Guardrail Rules
-
-| Rule # | Rule Identifier | Policy Enforcement | Safe Stopping Trigger |
-| :--- | :--- | :--- | :--- |
-| **Rule 1** | `attempt_limit` | Maximum 2 retry attempts per recovery cycle | `MAX_ATTEMPTS_REACHED` |
-| **Rule 2** | `retry_interval` | Minimum 24 hours cooldown between retry attempts | Blocked until cooldown expires |
-| **Rule 3** | `recovery_window` | Maximum 7 days from initial failure timestamp | `RECOVERY_WINDOW_EXPIRED` |
-| **Rule 4** | `customer_opt_out` | Opt-out request immediately blocks retries | `CUSTOMER_OPTED_OUT` |
-| **Rule 5** | `customer_dispute` | Active chargeback/dispute locks mandate | `CUSTOMER_DISPUTED` → Human Review |
-| **Rule 6** | `repeated_failures` | Hard decline failures trigger immediate stop | `RECOVERY_FAILED` |
-| **Rule 7** | `payment_success` | Already recovered mandates prohibit duplicate debits | `PAYMENT_RECOVERED` |
-| **Rule 8** | `ai_override_prohibition`| AI recommendations cannot override any guardrail | Block enforced regardless of AI score |
-| **Rule 9** | `human_review_lock` | Cases in Human Review cannot be auto-retried | Manual resolution required |
-| **Rule 10**| `expired_window_lock` | Expired recovery windows strictly prohibit execution | Permanent Safe Stop |
-
----
-
-## 4. Why Did SmartRecover Stop?
-
-Safe stopping is a first-class feature in SmartRecover:
-
-- **SUCCESS**: *"Workflow stopped automatically because payment was successfully recovered."*
-- **MAX ATTEMPTS**: *"Workflow stopped because the maximum number of retry attempts (2) was reached."*
-- **DISPUTE**: *"Automation stopped because customer disputed the payment. Human review is required."*
-- **OPT-OUT**: *"Automation stopped because the customer opted out of payment recovery."*
-- **RECOVERY WINDOW**: *"Automation stopped because the maximum 7-day recovery window has expired."*
+### 5. AI Safety Guardrail Stress-Test Mode
+Adversarial demonstration harness that intentionally feeds unsafe, aggressive AI recommendations into the `GuardrailEngine` to prove deterministic safety enforcement:
+- **Predefined Scenarios**:
+  - *Active Dispute Override Attempt*: AI proposes `RETRY_NOW` ➔ Blocked by Rule 5 (Dispute).
+  - *Retry Limit Bypass Attempt*: AI proposes `RETRY_AFTER_6H` on 2-attempt case ➔ Blocked by Rule 1 (Attempt Limit).
+  - *High-Risk Account Attempt*: AI proposes `RETRY_NOW` on flagged account ➔ Blocked by Risk Policy.
+  - *Post-Stop Execution Attempt*: AI attempts reactivation for opted-out user ➔ Blocked by Rule 4 (Opt-Out).
+  - *Compliant Baseline Case*: AI proposes `RETRY_AFTER_24H` ➔ Verified Allowed across all 10 invariants.
+- **Interactive Sandbox**: Configure custom combinations of dispute, max retries, opt-out, high risk, and stopped states with zero real transaction risk.
 
 ---
 
-## 5. Technology Stack & Architecture
+## 3. The 10 Deterministic Guardrail Safety Invariants
 
-- **Backend**: Python 3.14 + FastAPI + Pydantic v2 + SQLAlchemy (PostgreSQL / SQLite test mode)
-- **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS + Lucide Icons
-- **Simulation Harness**: Deterministic payment simulator generating mock NPCI / E-NACH transaction IDs and bank references (Zero real payment credentials used)
-- **Testing**: Pytest automated suite covering all 15 core safety and stopping invariants
+Every recovery action is strictly evaluated against 10 immutable backend rules:
 
-```
-smartrecover/
-├── backend/
-│   ├── app/
-│   │   ├── api/             # REST Endpoints (Dashboard, Recovery Cases, Audit, Human Review, Simulator, Demo)
-│   │   ├── core/            # Engines: Workflow, Intelligence, Guardrails, Simulator, Audit, Human Review
-│   │   ├── models/          # 10 Normalized SQLAlchemy Database Models
-│   │   ├── schemas/         # Pydantic v2 Request/Response DTOs
-│   │   ├── config.py        # Environment Configuration
-│   │   ├── database.py      # SQLAlchemy Session Factory
-│   │   ├── seed.py          # Realistic Demo Dataset Seeder (1,248 cases)
-│   │   └── main.py          # FastAPI Application Entry Point
-│   └── tests/
-│       └── test_smartrecover.py # 17 Automated Backend Tests (100% passing)
-├── frontend/
-│   ├── src/
-│   │   ├── components/      # UI: KPICards, AIDecisionVsGuardrailPanel, AuditTimeline, StopReasonAnalytics, etc.
-│   │   ├── services/        # Typed API client
-│   │   ├── types/           # TypeScript DTO mappings
-│   │   └── App.tsx          # Main Fintech SaaS Dashboard
-│   └── vite.config.ts
-└── README.md
-```
+1. **Attempt Limit Rule**: Maximum 2 automated retry attempts permitted per recovery cycle.
+2. **Retry Interval Rule**: Minimum 24-hour cooldown between automated retries (NPCI/RBI clearing compliance).
+3. **Recovery Window Rule**: Maximum 7 calendar days from initial mandate failure.
+4. **Customer Opt-Out Rule**: Mandatory immediate stop upon customer cancellation/opt-out.
+5. **Dispute / Chargeback Rule**: Automated recovery strictly prohibited on active customer dispute.
+6. **Payment Success State Invariant**: Recovery cannot be initiated if payment is already recovered.
+7. **Human Review Lock**: Cases flagged for operator review cannot be retried without human resolution.
+8. **Idempotency Rule**: Prevents duplicate executions on identical request keys.
+9. **State Transition Validity**: Enforces strict mathematical state machine DAG.
+10. **Zero Execution in Simulation**: All stress tests and simulations strictly prevent gateway execution.
 
 ---
 
-## 6. Preloaded Demo Scenarios (Customers A – F)
+## 4. API Endpoints
 
-| Scenario | Customer | Amount | Initial State | AI Recommendation | Guardrail Decision | Outcome |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Customer A** | ABC Technologies | ₹14,999 | FAILED | `RETRY` (91% score) | `ALLOWED` | Ready for retry execution |
-| **Customer B** | BlueWave Dynamics | ₹9,999 | HUMAN_REVIEW | `HUMAN_REVIEW` (35% score) | `ALLOWED` | Routed to human review |
-| **Customer C** | Apex Retail Logistics | ₹14,999 | HUMAN_REVIEW | `RETRY` (85% score) | `BLOCKED` (Dispute) | AI overridden; routed to Review |
-| **Customer D** | CloudScale Analytics | ₹9,999 | FAILED | `RETRY` (90% score) | `ALLOWED` | 1-Click Complete Recovery Loop |
-| **Customer E** | Horizon Media Labs | ₹8,499 | STOPPED | `RETRY` (78% score) | `BLOCKED` (Max 2 Attempts) | Safely stopped |
-| **Customer F** | FinPulse Systems | ₹12,500 | STOPPED | `RETRY` (88% score) | `BLOCKED` (Opted Out) | Safely stopped |
+### Core Recovery Workflow
+- `GET /api/dashboard`: Executive KPI metrics, recovery rates, and stop reasons breakdown.
+- `GET /api/recovery-cases`: Filter and search recurring payment mandate failure cases.
+- `GET /api/recovery-cases/{id}`: Detailed case telemetry, attempt history, and customer context.
+- `POST /api/recovery-cases/{id}/analyze`: Run advisory AI recovery intelligence.
+- `POST /api/recovery-cases/{id}/validate-action`: Dual decision engine validation (AI + Guardrails).
+- `POST /api/recovery-cases/{id}/execute`: Execute simulated recovery action.
+- `GET /api/recovery-cases/{id}/audit`: Immutable audit log with state diffs.
+
+### Human Review & Operations
+- `GET /api/human-review`: Pending, reviewed, resolved, and escalated review queue.
+- `POST /api/human-review/{id}/review`: Mark case in-review with operator notes.
+- `POST /api/human-review/{id}/resolve`: Operator resolution with custom actions.
+- `POST /api/human-review/{id}/escalate`: Escalate case to legal or fraud team.
+
+### Strategy Optimizer & Failure Intelligence
+- `POST /api/optimizer/{case_id}/optimize`: Get structured strategy recommendation with confidence & factors.
+- `GET /api/optimizer/failure-catalog`: Retrieve complete 9-category failure taxonomy matrix.
+
+### What-If Simulator & Prioritization
+- `POST /api/what-if/{case_id}`: Run multi-pathway hypothetical recovery simulation.
+- `GET /api/prioritization/metrics`: Retrieve ranked top opportunities and expected value metrics.
+
+### AI Safety Stress Test & Simulator
+- `GET /api/stress-test/scenarios`: List predefined adversarial stress-test scenarios.
+- `POST /api/stress-test/run`: Run adversarial recommendation verification against GuardrailEngine.
+- `POST /api/simulator/payment-failure`: Trigger simulated payment failure.
+- `POST /api/simulator/dispute`: Trigger simulated dispute event.
+- `POST /api/simulator/opt-out`: Trigger simulated customer opt-out.
+- `POST /api/demo/reset`: Reset database to initial demo state.
 
 ---
 
-## 7. How to Run Locally
+## 5. Verification & Testing
 
-### Prerequisites
-- Python 3.10+ (or `uv`)
-- Node.js 18+ and `npm`
-
-### 1. Run the Backend API
-```powershell
-cd backend
-# Using uv (recommended)
-uv run uvicorn app.main:app --reload --port 8000
-
-# Or using standard python
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-```
-- API Docs: `http://localhost:8000/api/docs`
-- Health Check: `http://localhost:8000/api/health`
-
-### 2. Run the Frontend Dashboard
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-- Dashboard UI: `http://localhost:3000`
-
-### 3. Run Automated Safety Tests
-```powershell
+### Automated Backend Tests
+Run the comprehensive 31-test suite:
+```bash
 cd backend
 uv run pytest -v
 ```
-All 17 tests verify:
-- Successful recovery auto-stops workflow
-- Maximum 2 retry attempts limit
-- 24-hour retry cooldown invariant
-- 7-day recovery window expiration
-- Customer opt-out & dispute safe stops
-- AI inability to bypass GuardrailEngine
-- Execution re-validation and idempotency
-- Dynamic KPI calculations
+*Result: 31 passed, 100% test coverage for state machine, guardrails, optimizer, what-if simulator, prioritization, and stress testing.*
+
+### Frontend Production Build
+Compile the React/TypeScript/Tailwind frontend:
+```bash
+cd frontend
+npm run build
+```
+*Result: Clean compilation with 0 lint/TypeScript errors.*
 
 ---
 
-## 8. Security and Compliance
+## 6. Running Locally
 
-- **No Real Payment Credentials**: The system operates exclusively with mock transaction identifiers and realistic simulated bank responses.
-- **Backend-Authoritative Security**: Client-provided states or bypass flags are strictly rejected. The backend re-evaluates database state at execution time.
-- **Immutable Audit Trail**: All AI recommendations, guardrail checks, state transitions, and operator interventions are permanently recorded with timestamps.
+### Backend:
+```bash
+cd backend
+uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+- API Docs: `http://127.0.0.1:8000/api/docs`
+- Health Check: `http://127.0.0.1:8000/api/health`
+
+### Frontend:
+```bash
+cd frontend
+npm run dev -- --host 127.0.0.1 --port 3000
+```
+- Web Application: `http://127.0.0.1:3000`

@@ -42,13 +42,6 @@ export interface PaymentAttempt {
   created_at: string;
 }
 
-export interface RuleCheckDetail {
-  rule_name: string;
-  passed: boolean;
-  description: string;
-  details?: string;
-}
-
 export interface AIDecision {
   score: number;
   probability: number;
@@ -58,9 +51,16 @@ export interface AIDecision {
   factors: string[];
 }
 
+export interface RuleCheckDetail {
+  rule_name: string;
+  passed: boolean;
+  description: string;
+  details?: string;
+}
+
 export interface GuardrailDecision {
   allowed: boolean;
-  status: 'ALLOWED' | 'BLOCKED';
+  status: string;
   blocked_reason?: string;
   stop_reason?: string;
   rules_checked: RuleCheckDetail[];
@@ -184,4 +184,135 @@ export interface ExecuteActionResponse {
   current_case_status: string;
   stop_reason?: string;
   message: string;
+}
+
+// =================================================================
+// 5 MAJOR FEATURE TYPES
+// =================================================================
+
+export interface StrategyOptimizerResponse {
+  case_id: string;
+  strategy: string;
+  strategy_label: string;
+  recovery_score: number;
+  estimated_success_probability: number;
+  expected_recovery_amount: number;
+  confidence: number;
+  recommended_delay_hours: number;
+  reasoning: string[];
+  positive_factors: string[];
+  negative_factors: string[];
+  risk_level: string;
+  human_review_required: boolean;
+  guardrail_precheck_status: string;
+  guardrail_precheck_reason?: string;
+}
+
+export interface FailureClassificationDetail {
+  code: string;
+  name: string;
+  category: string;
+  description: string;
+  retry_suitable: boolean;
+  preferred_strategy: string;
+  recommended_delay_hours: number;
+  communication_recommendation: string;
+  risk_level: string;
+  human_review_required: boolean;
+  historical_recovery_rate: number;
+  explanation_template: string;
+}
+
+export interface WhatIfStrategyOption {
+  strategy: string;
+  label: string;
+  success_probability: number;
+  expected_recovery_amount: number;
+  risk_level: string;
+  customer_contact_risk: string;
+  expected_attempts: number;
+  is_recommended: boolean;
+  guardrail_allowed: boolean;
+  guardrail_reason?: string;
+  reason: string;
+}
+
+export interface WhatIfSimulationResponse {
+  case_id: string;
+  amount: number;
+  customer_name: string;
+  failure_code: string;
+  failure_reason: string;
+  strategies: WhatIfStrategyOption[];
+  best_strategy: string;
+  why_recommended: string[];
+  disclaimer: string;
+}
+
+export interface PriorityCaseSummary {
+  id: string;
+  customer_name: string;
+  customer_email: string;
+  amount: number;
+  recovery_probability: number;
+  expected_recovery_amount: number;
+  priority_tier: 'HIGH' | 'MEDIUM' | 'LOW';
+  priority_score: number;
+  failure_code: string;
+  failure_reason: string;
+  recommended_strategy: string;
+  guardrail_eligible: boolean;
+  rank: number;
+  explainable_factors: string[];
+}
+
+export interface RevenuePriorityMetrics {
+  total_revenue_at_risk: number;
+  expected_recoverable_revenue: number;
+  high_priority_count: number;
+  high_priority_amount: number;
+  medium_priority_count: number;
+  medium_priority_amount: number;
+  low_priority_count: number;
+  low_priority_amount: number;
+  top_opportunities: PriorityCaseSummary[];
+}
+
+export interface StressTestScenario {
+  id: string;
+  name: string;
+  description: string;
+  target_customer: string;
+  amount: number;
+  failure_code: string;
+  failure_reason: string;
+  proposed_ai_recommendation: string;
+  expected_guardrail_result: 'ALLOWED' | 'BLOCKED';
+  expected_block_reason?: string;
+  scenario_category: string;
+}
+
+export interface StressTestRunRequest {
+  scenario_id?: string;
+  custom_case_id?: string;
+  proposed_action?: string;
+  simulate_dispute?: boolean;
+  simulate_max_retries?: boolean;
+  simulate_opt_out?: boolean;
+  simulate_high_risk?: boolean;
+  simulate_stopped?: boolean;
+}
+
+export interface StressTestResult {
+  scenario_id: string;
+  scenario_name: string;
+  ai_proposed_action: string;
+  guardrail_allowed: boolean;
+  guardrail_status: string;
+  guardrail_blocked_reason?: string;
+  stop_reason?: string;
+  rules_checked: RuleCheckDetail[];
+  simulation_badge: string;
+  verdict_summary: string;
+  execution_blocked: boolean;
 }

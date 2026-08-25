@@ -379,3 +379,173 @@ def test_disputed_case_cannot_execute_automated_retry(client, setup_test_db):
     assert data["status"] == "BLOCKED"
     assert "dispute" in data["message"].lower()
 
+# =================================================================
+# TESTS FOR THE 5 NEW CAPABILITIES
+# =================================================================
+
+# 19. Strategy optimizer produces structured recommendation
+def test_strategy_optimizer_structured_recommendation(client, setup_test_db):
+    db = setup_test_db
+    case = create_sample_case(db, amount=14999.0, hist_success=14, hist_fail=1)
+
+    res = client.post(f"/api/optimizer/{case.id}/optimize")
+    assert res.status_code == 200
+    data = res.json()
+    assert "strategy" in data
+    assert "recovery_score" in data
+    assert "estimated_success_probability" in data
+    assert "expected_recovery_amount" in data
+    assert "confidence" in data
+    assert len(data["reasoning"]) > 0
+    assert data["expected_recovery_amount"] > 0
+
+# 20. BANK_NETWORK_TIMEOUT recommends delayed retry (24h)
+def test_bank_network_timeout_recommends_delayed_retry(client, setup_test_db):
+    db = setup_test_db
+    case = create_sample_case(db, amount=9999.0)
+    case.failure_code = "BANK_NETWORK_TIMEOUT"
+    db.commit()
+
+    res = client.post(f"/api/optimizer/{case.id}/optimize")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["strategy"] in ["RETRY_AFTER_24H", "RETRY_AFTER_6H"]
+    assert data["recommended_delay_hours"] == 24
+    assert data["risk_level"] == "LOW"
+
+# 21. INSUFFICIENT_FUNDS recommends payment reminder and 48h delay
+def test_insufficient_funds_recommends_payment_reminder(client, setup_test_db):
+    db = setup_test_db
+    case = create_sample_case(db, amount=5000.0)
+    case.failure_code = "INSUFFICIENT_FUNDS"
+    db.commit()
+
+    res = client.post(f"/api/optimizer/{case.id}/optimize")
+    assert res.status_code == 200
+    data = res.json()
+    assert "REMINDER" in data["strategy"] or data["recommended_delay_hours"] >= 24
+
+# 22. CUSTOMER_DISPUTE cannot result in allowed automated retry
+def test_customer_dispute_cannot_result_in_allowed_retry(client, setup_test_db):
+    db = setup_test_db
+    case = create_sample_case(db, has_dispute=True)
+    case.failure_code = "CUSTOMER_DISPUTE"
+    db.commit()
+
+    res = client.post(f"/api/optimizer/{case.id}/optimize")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["strategy"] == "STOP_RECOVERY"
+    assert data["guardrail_precheck_status"] == "BLOCKED"
+    assert data["human_review_required"] is True
+
+# 23. Repeated retry case is blocked by guardrails
+def test_repeated_retry_case_blocked_by_guardrails(client, setup_test_db):
+    db = setup_test_db
+    case = create_sample_case(db, attempt_count=2)
+    case.failure_code = "REPEATED_FAILURE"
+    db.commit()
+
+    res = client.post(f"/api/optimizer/{case.id}/optimize")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["strategy"] == "STOP_RECOVERY"
+    assert data["guardrail_precheck_status"] == "BLOCKED"
+
+# 24. What-if simulator never executes payment and returns comparative strategies
+def test_what_if_simulator_never_executes_payment(client, setup_test_db):
+    db = setup_test_db
+    case = create_sample_case(db, amount=14999.0)
+
+    # Initial attempts count
+    initial_attempts = len(case.payment_attempts)
+
+    res = client.post(f"/api/what-if/{case.id}")
+    assert res.status_code == 200
+    data = res.json()
+
+    assert data["case_id"] == case.id
+    assert len(data["strategies"]) >= 4
+    assert data["disclaimer"] == "SIMULATION — NO PAYMENT WILL BE EXECUTED"
+
+    # Verify no payment attempt was created in DB
+    db.refresh(case)
+    assert len(case.payment_attempts) == initial_attempts
+
+# 25. Simulation events are recorded with SIMULATION_ONLY badge
+def test_simulation_events_marked_simulation_only(client, setup_test_db):
+    db = setup_test_db
+    case = create_sample_case(db)
+
+    res = client.post(f"/api/what-if/{case.id}")
+    assert res.status_code == 200
+
+    # Verify audit log
+    logs = db.query(AuditLog).filter(
+        AuditLog.recovery_case_id == case.id,
+        AuditLog.event_type == "WHAT_IF_SIMULATION_RUN"
+    ).all()
+    assert len(logs) > 0
+    assert logs[0].actor == "SIMULATION_ENGINE"
+    assert logs[0].log_metadata.get("badge") == "SIMULATION_ONLY"
+
+# 26. Revenue priority calculation works and ranks by expected recovery
+def test_revenue_priority_calculation(client, setup_test_db):
+    db = setup_test_db
+    case_high = create_sample_case(db, amount=50000.0, hist_success=15)
+    case_high.recovery_probability = 0.90
+    case_low = create_sample_case(db, amount=500.0, hist_success=0, hist_fail=3)
+    case_low.recovery_probability = 0.10
+    db.commit()
+
+    res = client.get("/api/prioritization/metrics")
+    assert res.status_code == 200
+    data = res.json()
+
+    assert data["total_revenue_at_risk"] > 0
+    assert data["expected_recoverable_revenue"] > 0
+    assert len(data["top_opportunities"]) > 0
+
+    # Top opportunity should have higher expected recovery
+    top_case = data["top_opportunities"][0]
+    assert top_case["rank"] == 1
+    assert top_case["expected_recovery_amount"] >= data["top_opportunities"][-1]["expected_recovery_amount"]
+
+# 27. Stress test correctly blocks unsafe AI recommendation
+def test_stress_test_correctly_blocks_unsafe_ai_recommendation(client):
+    res = client.post("/api/stress-test/run", json={
+        "scenario_id": "STRESS-DISPUTE-01"
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert data["guardrail_allowed"] is False
+    assert data["guardrail_status"] == "BLOCKED"
+    assert "dispute" in data["guardrail_blocked_reason"].lower()
+    assert data["simulation_badge"] == "SIMULATION_ONLY"
+    assert data["execution_blocked"] is True
+
+# 28. Safe recommendation can pass guardrails in benchmark scenario
+def test_safe_recommendation_can_pass_guardrails(client):
+    res = client.post("/api/stress-test/run", json={
+        "scenario_id": "STRESS-SAFE-CASE-05"
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert data["guardrail_allowed"] is True
+    assert data["guardrail_status"] == "ALLOWED"
+    assert data["execution_blocked"] is True
+
+# 29. Failure intelligence catalog endpoint returns all 9 failure categories
+def test_failure_catalog_endpoint(client):
+    res = client.get("/api/optimizer/failure-catalog")
+    assert res.status_code == 200
+    data = res.json()
+    assert len(data) >= 9
+    codes = [item["code"] for item in data]
+    assert "BANK_NETWORK_TIMEOUT" in codes
+    assert "INSUFFICIENT_FUNDS" in codes
+    assert "CUSTOMER_DISPUTE" in codes
+    assert "FRAUD_OR_RISK_SIGNAL" in codes
+    assert "MANDATE_EXPIRED" in codes
+
+

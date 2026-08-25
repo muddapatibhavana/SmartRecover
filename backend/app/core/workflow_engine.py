@@ -170,10 +170,15 @@ class RecoveryWorkflowEngine:
             reason=f"AI recommended {ai_res.recommended_action} with recovery score {ai_res.score:.1f}/100",
             actor="RECOVERY_INTELLIGENCE",
             metadata={
-                "score": ai_res.score,
-                "probability": ai_res.probability,
+                "case_id": case.id,
                 "recommendation": ai_res.recommended_action,
-                "factors": ai_res.factors
+                "strategy": ai_res.recommended_action,
+                "recovery_score": ai_res.score,
+                "probability": ai_res.probability,
+                "expected_recovery": round(case.amount * ai_res.probability, 2),
+                "factors": ai_res.factors,
+                "timestamp": now.isoformat(),
+                "simulation_status": "SIMULATION_ONLY"
             }
         )
 
@@ -183,7 +188,12 @@ class RecoveryWorkflowEngine:
             case=case,
             new_status=StateConstants.GUARDRAIL_CHECK,
             reason="Submitting AI recommendation to GuardrailEngine for compliance verification",
-            actor="SYSTEM"
+            actor="SYSTEM",
+            metadata={
+                "case_id": case.id,
+                "proposed_action": "RETRY_PAYMENT" if ai_res.recommended_action in ["RETRY", "NOTIFY"] else "ROUTE_HUMAN_REVIEW",
+                "timestamp": now.isoformat()
+            }
         )
 
         last_attempt_time = attempts[-1].created_at if attempts else None
@@ -228,7 +238,17 @@ class RecoveryWorkflowEngine:
                 new_status=StateConstants.ACTION_ALLOWED,
                 reason=f"Guardrail verification PASSED for {proposed_act}",
                 actor="GUARDRAIL_ENGINE",
-                metadata={"rules_passed": len(guardrail_res.rules_checked)}
+                metadata={
+                    "case_id": case.id,
+                    "guardrail_result": guardrail_res.status,
+                    "final_action": proposed_act,
+                    "rules_passed": len(guardrail_res.rules_checked),
+                    "recovery_score": ai_res.score,
+                    "probability": ai_res.probability,
+                    "expected_recovery": round(case.amount * ai_res.probability, 2),
+                    "timestamp": now.isoformat(),
+                    "simulation_status": "SIMULATION_ONLY"
+                }
             )
             case.next_action = proposed_act
             case.next_action_scheduled_at = now + timedelta(hours=ai_res.recommended_delay_hours)
@@ -239,7 +259,14 @@ class RecoveryWorkflowEngine:
                 new_status=StateConstants.ACTION_BLOCKED,
                 reason=f"Guardrail verification BLOCKED: {guardrail_res.blocked_reason}",
                 actor="GUARDRAIL_ENGINE",
-                metadata={"blocked_reason": guardrail_res.blocked_reason, "stop_reason": guardrail_res.stop_reason}
+                metadata={
+                    "case_id": case.id,
+                    "guardrail_result": guardrail_res.status,
+                    "blocked_reason": guardrail_res.blocked_reason,
+                    "stop_reason": guardrail_res.stop_reason,
+                    "timestamp": now.isoformat(),
+                    "simulation_status": "SIMULATION_ONLY"
+                }
             )
             case.stop_reason = guardrail_res.stop_reason
             case.next_action = None

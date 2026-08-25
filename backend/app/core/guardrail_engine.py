@@ -87,6 +87,19 @@ class GuardrailEngine:
             blocked_reason = "Active customer dispute detected. Automatic retries strictly prohibited."
             stop_reason = StopReasonConstants.CUSTOMER_DISPUTED
 
+        # RULE 6: Fraud or High-Risk Signal Check
+        is_high_risk = bool(customer.get("is_high_risk", False)) or bool(case_data.get("is_high_risk", False)) or (case_data.get("failure_code") == "FRAUD_OR_RISK_SIGNAL")
+        rules_checked.append(RuleCheckDetail(
+            rule_name="fraud_risk_signal",
+            passed=not is_high_risk,
+            description="No fraud anomaly or high-risk signal active on account",
+            details="High-risk anomaly or fraud signal detected on account" if is_high_risk else "Account risk profile clean"
+        ))
+        if is_high_risk and not is_blocked:
+            is_blocked = True
+            blocked_reason = "High-risk compliance anomaly or fraud signal detected. Automated retries strictly prohibited."
+            stop_reason = StopReasonConstants.HUMAN_REVIEW_REQUIRED
+
         # RULE 1: Maximum Retry Attempts Check (Max 2)
         attempts_exceeded = (attempt_count >= cls.MAX_RETRY_ATTEMPTS)
         rules_checked.append(RuleCheckDetail(
@@ -132,6 +145,19 @@ class GuardrailEngine:
             is_blocked = True
             blocked_reason = f"Minimum retry cooldown of {cls.MIN_RETRY_INTERVAL_HOURS} hours has not elapsed ({hours_since_last:.1f}h elapsed)."
             stop_reason = None  # Not a terminal stop, but blocked until interval expires
+
+        # RULE: Post-Stop State Check
+        is_stopped = (current_status == StateConstants.STOPPED)
+        rules_checked.append(RuleCheckDetail(
+            rule_name="workflow_stopped_state",
+            passed=not is_stopped,
+            description="Recovery workflow active and not in stopped state",
+            details="Recovery case is already in STOPPED state" if is_stopped else "Workflow is active"
+        ))
+        if is_stopped and not is_blocked:
+            is_blocked = True
+            blocked_reason = "Recovery case is in STOPPED state. Automation cannot execute retries."
+            stop_reason = StopReasonConstants.RECOVERY_FAILED
 
         # RULE 9: Human Review Exclusivity
         if current_status == StateConstants.HUMAN_REVIEW and proposed_action == "RETRY_PAYMENT":

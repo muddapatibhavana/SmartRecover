@@ -6,7 +6,18 @@ from app.config import settings
 from app.database import engine, Base, SessionLocal
 from app.models.entities import Customer
 from app.seed import seed_database
-from app.api import dashboard, recovery_cases, audit, human_review, simulator, demo
+from app.api import (
+    dashboard,
+    recovery_cases,
+    audit,
+    human_review,
+    simulator,
+    demo,
+    optimizer,
+    what_if,
+    prioritization,
+    stress_test
+)
 
 # Configure structured logging
 logging.basicConfig(
@@ -57,6 +68,10 @@ app.include_router(audit.router, prefix=settings.API_PREFIX)
 app.include_router(human_review.router, prefix=settings.API_PREFIX)
 app.include_router(simulator.router, prefix=settings.API_PREFIX)
 app.include_router(demo.router, prefix=settings.API_PREFIX)
+app.include_router(optimizer.router, prefix=settings.API_PREFIX)
+app.include_router(what_if.router, prefix=settings.API_PREFIX)
+app.include_router(prioritization.router, prefix=settings.API_PREFIX)
+app.include_router(stress_test.router, prefix=settings.API_PREFIX)
 
 @app.get(f"{settings.API_PREFIX}/health")
 def health_check():

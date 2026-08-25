@@ -7,6 +7,14 @@ import { CaseDetailModal } from './components/CaseDetailModal';
 import { HumanReviewQueue } from './components/HumanReviewQueue';
 import { PaymentSimulatorControls } from './components/PaymentSimulatorControls';
 import { DemoScenarioSelector } from './components/DemoScenarioSelector';
+
+// 5 New Feature Components
+import { RecoveryStrategyOptimizer } from './components/RecoveryStrategyOptimizer';
+import { FailureReasonIntelligence } from './components/FailureReasonIntelligence';
+import { WhatIfRecoverySimulator } from './components/WhatIfRecoverySimulator';
+import { RevenuePriorityDashboard } from './components/RevenuePriorityDashboard';
+import { GuardrailStressTestView } from './components/GuardrailStressTestView';
+
 import {
   fetchDashboardMetrics,
   fetchRecoveryCases,
@@ -99,25 +107,31 @@ export default function App() {
             {/* Header Hero */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-blue-950/40 via-slate-900/60 to-purple-950/30 p-6 rounded-2xl border border-slate-800">
               <div>
-                <span className="text-xs uppercase font-bold tracking-wider text-blue-400">AI Revenue Recovery Track</span>
-                <h1 className="text-2xl font-extrabold text-white tracking-tight mt-1">Failed Mandate & Payment Recovery</h1>
+                <span className="text-xs uppercase font-bold tracking-wider text-blue-400">Autonomous Failed-Payment Recovery</span>
+                <h1 className="text-2xl font-extrabold text-white tracking-tight mt-1">SmartRecover Enterprise Console</h1>
                 <p className="text-xs text-slate-400 mt-1 max-w-xl">
-                  AI recommends whether, when, and how to recover revenue. Deterministic safety guardrails strictly control execution.
+                  AI recommends optimal recovery strategies. Deterministic safety guardrails control all execution. Zero real credentials.
                 </p>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2.5">
                 <button
-                  onClick={() => setActiveTab('scenarios')}
-                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
+                  onClick={() => setActiveTab('priorities')}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all cursor-pointer"
                 >
-                  🚀 Quick Demo Journeys
+                  📈 Revenue Priorities
                 </button>
                 <button
-                  onClick={() => setSelectedCaseId('SR-1024')}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs transition-all cursor-pointer"
+                  onClick={() => setActiveTab('stress-test')}
+                  className="px-3.5 py-2 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white font-bold text-xs shadow-lg shadow-rose-600/30 transition-all cursor-pointer"
                 >
-                  Inspect Case #SR-1024
+                  🛡️ Safety Stress Test
+                </button>
+                <button
+                  onClick={() => setActiveTab('what-if')}
+                  className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
+                >
+                  ⚡ What-If Simulator
                 </button>
               </div>
             </div>
@@ -139,7 +153,7 @@ export default function App() {
                 </div>
                 <button
                   onClick={() => setActiveTab('cases')}
-                  className="text-xs font-semibold text-blue-400 hover:text-blue-300"
+                  className="text-xs font-semibold text-blue-400 hover:text-blue-300 cursor-pointer"
                 >
                   View All Cases →
                 </button>
@@ -158,7 +172,38 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab 2: Recovery Cases View */}
+        {/* Feature 4: Revenue Priorities Tab */}
+        {activeTab === 'priorities' && (
+          <RevenuePriorityDashboard onSelectCase={(id) => setSelectedCaseId(id)} />
+        )}
+
+        {/* Feature 1: Strategy Optimizer Tab */}
+        {activeTab === 'optimizer' && (
+          <RecoveryStrategyOptimizer
+            initialCaseId="SR-1024"
+            onSelectCase={(id) => setSelectedCaseId(id)}
+          />
+        )}
+
+        {/* Feature 2: Failure Intelligence Tab */}
+        {activeTab === 'failure-intel' && (
+          <FailureReasonIntelligence />
+        )}
+
+        {/* Feature 3: What-If Simulator Tab */}
+        {activeTab === 'what-if' && (
+          <WhatIfRecoverySimulator
+            initialCaseId="SR-1024"
+            onSelectCase={(id) => setSelectedCaseId(id)}
+          />
+        )}
+
+        {/* Feature 5: Safety Stress Test Tab */}
+        {activeTab === 'stress-test' && (
+          <GuardrailStressTestView />
+        )}
+
+        {/* Tab: All Recovery Cases View */}
         {activeTab === 'cases' && (
           <div className="space-y-4">
             <div>
@@ -177,7 +222,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab 3: Human Review View */}
+        {/* Tab: Human Review View */}
         {activeTab === 'human-review' && (
           <HumanReviewQueue
             reviews={reviews}
@@ -187,7 +232,7 @@ export default function App() {
           />
         )}
 
-        {/* Tab 4: Payment Simulator View */}
+        {/* Tab: Payment Simulator View */}
         {activeTab === 'simulator' && (
           <div className="space-y-6">
             <PaymentSimulatorControls onSimulationComplete={refreshAll} />
@@ -206,7 +251,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab 5: Demo Scenarios View */}
+        {/* Tab: Demo Scenarios View */}
         {activeTab === 'scenarios' && (
           <DemoScenarioSelector
             onSelectCase={(id) => setSelectedCaseId(id)}

@@ -5,10 +5,17 @@ import {
   DualDecisionView,
   AuditLogEntry,
   HumanReviewItem,
-  ExecuteActionResponse
+  ExecuteActionResponse,
+  StrategyOptimizerResponse,
+  FailureClassificationDetail,
+  WhatIfSimulationResponse,
+  RevenuePriorityMetrics,
+  StressTestScenario,
+  StressTestResult,
+  StressTestRunRequest
 } from '../types';
 
-const API_BASE = 'https://smartrecover-backend.onrender.com/api';
+const API_BASE = '/api';
 
 export async function fetchDashboardMetrics(): Promise<DashboardMetrics> {
   const res = await fetch(`${API_BASE}/dashboard`);
@@ -146,5 +153,55 @@ export async function resetDemoData(): Promise<any> {
 export async function loadDemoScenario(scenarioKey: string): Promise<any> {
   const res = await fetch(`${API_BASE}/demo/scenario/${scenarioKey}`, { method: 'POST' });
   if (!res.ok) throw new Error(`Failed to load scenario ${scenarioKey}`);
+  return res.json();
+}
+
+// =================================================================
+// 5 MAJOR FEATURE API CALLS
+// =================================================================
+
+export async function optimizeStrategy(caseId: string): Promise<StrategyOptimizerResponse> {
+  const res = await fetch(`${API_BASE}/optimizer/${caseId}/optimize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  });
+  if (!res.ok) throw new Error(`Failed to optimize strategy for case ${caseId}`);
+  return res.json();
+}
+
+export async function fetchFailureCatalog(): Promise<FailureClassificationDetail[]> {
+  const res = await fetch(`${API_BASE}/optimizer/failure-catalog`);
+  if (!res.ok) throw new Error('Failed to fetch failure intelligence catalog');
+  return res.json();
+}
+
+export async function runWhatIfSimulation(caseId: string): Promise<WhatIfSimulationResponse> {
+  const res = await fetch(`${API_BASE}/what-if/${caseId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  });
+  if (!res.ok) throw new Error(`Failed to run What-If simulation on case ${caseId}`);
+  return res.json();
+}
+
+export async function fetchRevenuePriorities(limit = 50): Promise<RevenuePriorityMetrics> {
+  const res = await fetch(`${API_BASE}/prioritization/metrics?limit=${limit}`);
+  if (!res.ok) throw new Error('Failed to fetch revenue recovery priorities');
+  return res.json();
+}
+
+export async function fetchStressTestScenarios(): Promise<StressTestScenario[]> {
+  const res = await fetch(`${API_BASE}/stress-test/scenarios`);
+  if (!res.ok) throw new Error('Failed to fetch stress test scenarios');
+  return res.json();
+}
+
+export async function runStressTest(request: StressTestRunRequest): Promise<StressTestResult> {
+  const res = await fetch(`${API_BASE}/stress-test/run`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request)
+  });
+  if (!res.ok) throw new Error('Failed to execute guardrail stress test');
   return res.json();
 }
